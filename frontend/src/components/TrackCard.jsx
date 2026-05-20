@@ -48,6 +48,8 @@ export function TransitionConnector({ prev, curr }) {
   const harmonic    = getHarmonicInfo(prevCamelot, currCamelot);
   const bpmCat      = getBpmCategory(curr.bpm - prev.bpm);
   const eDelta      = getEnergyDelta(prev.energy, curr.energy);
+  const prevLabel   = getKeyLabel(prev.key, prev.mode);
+  const currLabel   = getKeyLabel(curr.key, curr.mode);
 
   const bpmColorMap = { emerald: 'text-emerald-400', yellow: 'text-yellow-400', red: 'text-red-400' };
   const eColor = eDelta.delta > 5 ? 'text-red-400' : eDelta.delta < -5 ? 'text-cyan-400' : 'text-emerald-400';
@@ -64,7 +66,7 @@ export function TransitionConnector({ prev, curr }) {
         <span className={`text-xs font-mono ${eColor}`}>
           Energía {eDelta.label}
         </span>
-        <HarmonicBadge info={harmonic} c1={prevCamelot} c2={currCamelot} />
+        <HarmonicBadge info={harmonic} c1={prevLabel} c2={currLabel} />
         {curr.step_cost != null && (
           <span className="text-xs font-mono text-slate-600">
             coste: {curr.step_cost.toFixed(3)}
@@ -76,7 +78,7 @@ export function TransitionConnector({ prev, curr }) {
 }
 
 // Tarjeta principal de canción
-export default function TrackCard({ track, isStart, isEnd }) {
+export default function TrackCard({ track, isStart, isEnd, onRemove }) {
   const camelot = getCamelot(track.key, track.mode);
 
   const roleBadge = isStart
@@ -95,20 +97,35 @@ export default function TrackCard({ track, isStart, isEnd }) {
 
   return (
     <div className={`bg-slate-900 border ${borderClass} rounded-xl p-4 space-y-3 relative`}>
+      {/* Botón de eliminación para canciones intermedias */}
+      {onRemove && (
+        <button
+          onClick={() => onRemove(track.track_id)}
+          title="Eliminar de la ruta"
+          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center
+                     rounded-full text-slate-600 hover:text-red-400 hover:bg-red-900/30
+                     transition-colors duration-150 z-10"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+
       {/* Cabecera: número de paso + nombre + artista */}
       <div className="flex items-start gap-3">
         <span className={`shrink-0 text-xs font-mono font-bold px-2 py-0.5 rounded ${roleBadge}`}>
           {roleLabel}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-white truncate leading-tight">
+          <h3 className="text-base font-bold text-white truncate leading-tight pr-6">
             {track.track_name}
           </h3>
           <p className="text-xs text-slate-400 truncate mt-0.5">{track.artists}</p>
         </div>
         {track.genre && (
           <span className="shrink-0 text-xs font-mono bg-slate-800 text-slate-500
-                           px-2 py-0.5 rounded capitalize">
+                           px-2 py-0.5 rounded capitalize mr-4">
             {track.genre}
           </span>
         )}
@@ -117,8 +134,7 @@ export default function TrackCard({ track, isStart, isEnd }) {
       {/* Métricas principales — chips */}
       <div className="flex flex-wrap gap-2">
         <Chip color="violet" label={`${track.bpm} BPM`} />
-        <Chip color="cyan"   label={camelot} title={getKeyLabel(track.key, track.mode)} />
-        <Chip color="slate"  label={track.mode === 1 ? 'Mayor' : 'Menor'} />
+        <Chip color="cyan" label={getKeyLabel(track.key, track.mode)} title={`Camelot: ${camelot}`} />
         {track.popularity != null && (
           <Chip color="slate" label={`Pop. ${track.popularity}`} />
         )}

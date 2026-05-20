@@ -81,7 +81,7 @@ export default function GraphPanel({ job, onInit, disabled }) {
       {status === 'idle' && (
         <p className="text-xs text-slate-600 font-mono">
           La inicialización importa el dataset completo (~113k canciones), calcula similitudes coseno
-          con GDS kNN y proyecta el grafo Dijkstra. Puede tardar <strong className="text-slate-400">5–15 minutos</strong> según el hardware.
+          con GDS kNN y proyecta el grafo de rutas A*. Puede tardar <strong className="text-slate-400">5–15 minutos</strong> según el hardware.
         </p>
       )}
     </div>

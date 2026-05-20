@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
-import { getCamelot, KEY_NAMES } from '../utils/music';
+import { getKeyLabel } from '../utils/music';
 
 // Debounce simple sin dependencias externas
 function useDebounce(value, delay) {
@@ -79,7 +79,7 @@ export default function TrackSearch({ label, selected, onSelect, disabled }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-xs font-mono bg-violet-900/50 text-violet-300 px-2 py-0.5 rounded">
-                {getCamelot(selected.key, selected.mode)}
+                {getKeyLabel(selected.key, selected.mode)}
               </span>
               <span className="text-xs font-mono text-cyan-400">{selected.bpm} BPM</span>
               <button
@@ -135,7 +135,7 @@ export default function TrackSearch({ label, selected, onSelect, disabled }) {
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-slate-500 font-mono">{track.genre}</span>
                   <span className="text-xs font-mono bg-violet-900/40 text-violet-400 px-1.5 py-0.5 rounded">
-                    {getCamelot(track.key, track.mode)}
+                    {getKeyLabel(track.key, track.mode)}
                   </span>
                   <span className="text-xs font-mono text-cyan-500">{track.bpm}</span>
                 </div>

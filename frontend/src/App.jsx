@@ -3,6 +3,7 @@ import { api } from './services/api';
 import GraphPanel from './components/GraphPanel';
 import TrackSearch from './components/TrackSearch';
 import TrackTimeline from './components/TrackTimeline';
+import RouteEditPanel from './components/RouteEditPanel';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -16,7 +17,9 @@ export default function App() {
   const [endTrack,   setEndTrack]   = useState(null);
   const [loading,    setLoading]    = useState(false);
   const [result,     setResult]     = useState(null);
+  const [playlist,   setPlaylist]   = useState(null);
   const [apiError,   setApiError]   = useState('');
+  const [routeKey,   setRouteKey]   = useState(0);
   const pollRef = useRef(null);
 
   // ── Polling del estado del init ───────────────────────────────────────────
@@ -64,15 +67,26 @@ export default function App() {
     if (!startTrack || !endTrack) return;
     setLoading(true);
     setResult(null);
+    setPlaylist(null);
     setApiError('');
     try {
       const data = await api.recommend(startTrack.track_id, endTrack.track_id);
       setResult(data);
+      setPlaylist(data.playlist);
+      setRouteKey(k => k + 1);
     } catch (err) {
       setApiError(err.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleRemoveTrack(trackId) {
+    setPlaylist(prev => prev.filter(t => t.track_id !== trackId));
+  }
+
+  function handleFilterChange(filtered) {
+    setPlaylist(filtered);
   }
 
   const graphReady  = job.status === 'done';
@@ -93,7 +107,7 @@ export default function App() {
                 DJ Graph Recommender
               </h1>
               <p className="text-xs text-slate-500 font-mono hidden sm:block">
-                Neo4j GDS · kNN cosine · Dijkstra shortest path
+                Neo4j GDS · kNN coseno · A* camino óptimo
               </p>
             </div>
           </div>
@@ -110,7 +124,6 @@ export default function App() {
 
       {/* ── Contenido principal ───────────────────────────────────────────── */}
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {/* Panel de estado del grafo */}
         <GraphPanel job={job} onInit={handleInit} disabled={false} />
 
         {/* Selección de canciones */}
@@ -169,7 +182,7 @@ export default function App() {
                     <path className="opacity-75" fill="currentColor"
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                   </svg>
-                  Calculando ruta Dijkstra...
+                  Calculando ruta A*...
                 </>
               ) : (
                 <>⚡ Generar Transición Perfecta</>
@@ -190,22 +203,29 @@ export default function App() {
           </div>
         )}
 
-        {/* Resultado: Timeline */}
-        {result && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-            <TrackTimeline
-              playlist={result.playlist}
-              totalCost={result.total_cost}
-              totalHops={result.total_hops}
+        {/* Resultado: filtros + timeline editable */}
+        {result && playlist && (
+          <>
+            <RouteEditPanel
+              key={routeKey}
+              originalPlaylist={result.playlist}
+              onFilter={handleFilterChange}
             />
-          </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <TrackTimeline
+                playlist={playlist}
+                onRemove={handleRemoveTrack}
+                pathType={result?.path_type}
+              />
+            </div>
+          </>
         )}
       </main>
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <footer className="border-t border-slate-800 mt-16 py-6 text-center">
         <p className="text-xs text-slate-700 font-mono">
-          Neo4j 5.18 · GDS kNN cosine similarity · Dijkstra shortest path · React + Tailwind
+          Neo4j 5.18 · GDS kNN cosine similarity · A* shortest path · React + Tailwind
         </p>
       </footer>
     </div>

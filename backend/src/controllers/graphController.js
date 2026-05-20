@@ -71,10 +71,51 @@ async function runInit() {
      * bpm_normalized mapea [60–200 BPM] a [0.0–1.0] para igualar la escala
      * con energy, danceability y valence antes de aplicar similitud coseno.
      */
+    /*
+     * Codificación armónica circular (Rueda de Camelot / Círculo de Quintas):
+     *
+     * Spotify devuelve key (0-11, cromatico) y mode (0=menor, 1=mayor).
+     * No se puede usar key directamente en cosine similarity porque es circular
+     * (Do=0 y Si=11 son adyacentes, no distantes). La solución:
+     *
+     *   1. Convertir de cromático a posición en el círculo de quintas:
+     *        fifthPos = (key × 7) mod 12
+     *        (×7 porque una quinta perfecta = 7 semitonos)
+     *
+     *   2. Obtener índice Camelot 0-11 (número - 1):
+     *        mayor: ci = ((fifthPos + 5) mod 12 + 11) mod 12
+     *        menor: ci = ((fifthPos + 2) mod 12 + 11) mod 12
+     *
+     *   3. Mapear a 24 posiciones intercalando mayor/menor:
+     *        wheelPos = ci×2          para mayor (B en Camelot)
+     *        wheelPos = ci×2 + 1      para menor (A en Camelot)
+     *        → posiciones adyacentes = tónica relativa (máx. compatibilidad)
+     *
+     *   4. Coordenadas trigonométricas normalizadas a [0,1]:
+     *        angle   = 2π × wheelPos / 24
+     *        key_cos = (cos(angle) + 1) / 2
+     *        key_sin = (sin(angle) + 1) / 2
+     *
+     * Verificación: Do mayor (8B) ↔ La menor (8A) = posiciones 8 y 9 → distancia 1 ✓
+     *              Do mayor (8B) ↔ Sol mayor (6B) = posiciones 8 y 10 → distancia 2 ✓
+     */
     await session.run(`
       LOAD CSV WITH HEADERS FROM 'file:///dataset.csv' AS row
       CALL {
         WITH row
+        WITH row,
+             CASE WHEN row.key IS NOT NULL AND toInteger(row.key) >= 0
+                  THEN toInteger(row.key) % 12 ELSE 0 END AS k,
+             CASE WHEN row.mode IN ['0','1']
+                  THEN toInteger(row.mode) ELSE 1 END AS m
+        WITH row, k, m,
+             CASE m
+               WHEN 1 THEN ((k * 7 % 12 + 5) % 12 + 11) % 12
+               ELSE        ((k * 7 % 12 + 2) % 12 + 11) % 12
+             END AS ci
+        WITH row,
+             toFloat(ci * 2 + 1 - m) * 2.0 * pi() / 24.0 AS hAngle,
+             k AS rawKey, m AS rawMode
         MERGE (s:Song {track_id: row.track_id})
         ON CREATE SET
           s.track_name     = row.track_name,
@@ -93,7 +134,9 @@ async function runInit() {
             WHEN toFloat(row.tempo) < 60  THEN 0.0
             WHEN toFloat(row.tempo) > 200 THEN 1.0
             ELSE (toFloat(row.tempo) - 60.0) / 140.0
-          END
+          END,
+          s.key_cos        = (cos(hAngle) + 1.0) / 2.0,
+          s.key_sin        = (sin(hAngle) + 1.0) / 2.0
       } IN TRANSACTIONS OF 2000 ROWS
     `);
 
@@ -110,6 +153,8 @@ async function runInit() {
      * Proyectamos solo los nodos Song con sus propiedades numéricas.
      * kNN trabaja exclusivamente con vectores de nodos; no necesita relaciones.
      */
+    // key_cos y key_sin codifican la posición en la rueda de Camelot como
+    // coordenadas trigonométricas, preservando la circularidad del círculo de quintas.
     await session.run(`
       CALL gds.graph.project(
         $name,
@@ -119,7 +164,9 @@ async function runInit() {
               energy:         { defaultValue: 0.0 },
               danceability:   { defaultValue: 0.0 },
               valence:        { defaultValue: 0.0 },
-              bpm_normalized: { defaultValue: 0.5 }
+              bpm_normalized: { defaultValue: 0.5 },
+              key_cos:        { defaultValue: 0.5 },
+              key_sin:        { defaultValue: 0.5 }
             }
           }
         },
@@ -138,10 +185,13 @@ async function runInit() {
      * Después invertimos: weight = 1 − score, de modo que Dijkstra minimice el
      * "coste de transición" (peso bajo = canciones acústicamente compatibles).
      */
+    // Vector de 6 dimensiones: 4 acústicas + 2 armónicas (círculo de quintas)
+    // Las coordenadas key_cos/key_sin aportan ~33% del peso total en cosine similarity,
+    // priorizando compatibilidad armónica sin sacrificar la cohesión acústica.
     await session.run(`
       CALL gds.knn.write($name, {
         topK: 8,
-        nodeProperties: ['energy', 'danceability', 'valence', 'bpm_normalized'],
+        nodeProperties: ['energy', 'danceability', 'valence', 'bpm_normalized', 'key_cos', 'key_sin'],
         writeRelationshipType: 'TRANSITIONS_TO',
         writeProperty: 'score',
         sampleRate: 0.5,

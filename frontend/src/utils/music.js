@@ -1,5 +1,5 @@
-// Nombres de tonalidades en notación estándar (Pitch Class 0–11)
-export const KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+// Nombres de tonalidades en notación española (Pitch Class 0–11)
+export const KEY_NAMES = ['Do', 'Reb', 'Re', 'Mib', 'Mi', 'Fa', 'Fa#', 'Sol', 'Lab', 'La', 'Sib', 'Si'];
 
 // Tabla de conversión Pitch Class + Mode → Camelot Wheel
 const CAMELOT_MAP = {
@@ -22,7 +22,7 @@ export function getCamelot(key, mode) {
 }
 
 export function getKeyLabel(key, mode) {
-  return `${KEY_NAMES[key] ?? '?'} ${mode === 1 ? 'Mayor' : 'Menor'}`;
+  return `${KEY_NAMES[key] ?? '?'} ${mode === 1 ? 'Mayor' : 'menor'}`;
 }
 
 /**

@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { startInit, getInitStatus } = require('../controllers/graphController');
-const { searchTracks, recommend }  = require('../controllers/recommendController');
+const { searchTracks, recommend, getGenres } = require('../controllers/recommendController');
 
 const router = Router();
 
@@ -13,6 +13,10 @@ router.get('/init-status',  getInitStatus);
 // ── Búsqueda de canciones ─────────────────────────────────────────────────────
 // GET /api/tracks/search?q=<texto>&limit=<n>
 router.get('/tracks/search', searchTracks);
+
+// ── Géneros disponibles ───────────────────────────────────────────────────────
+// GET /api/genres
+router.get('/genres', getGenres);
 
 // ── Recomendación Dijkstra ────────────────────────────────────────────────────
 // POST /api/recommend  body: { start_track_id, end_track_id }
