@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+
+  # ── Base de datos ──────────────────────────────────────────────────────────
+  neo4j:
+    image: neo4j:5.18.0
+    container_name: dj-neo4j
+    ports:
+      - "7474:7474"   # Neo4j Browser (consola web)
+      - "7687:7687"   # Bolt (driver Node.js)
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["graph-data-science"]
+      - NEO4J_dbms_security_procedures_unrestricted=gds.*
+      - NEO4J_dbms_security_procedures_allowlist=gds.*
+      - NEO4J_server_memory_heap_initial__size=1G
+      - NEO4J_server_memory_heap_max__size=4G
+      - NEO4J_dbms_memory_pagecache_size=2G
+      # Sin límite de tiempo de transacción para que GDS kNN pueda terminar
+      - NEO4J_dbms_transaction_timeout=0
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      # Solo el subdirectorio import se monta (evita que Neo4j cambie permisos del proyecto)
+      - ./import:/var/lib/neo4j/import
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:7474"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 90s   # El plugin GDS tarda en descargarse la primera vez
+
+  # ── Backend Node.js ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+    container_name: dj-backend
+    ports:
+      - "3001:3001"
+    environment:
+      # Dentro de Docker la URI usa el nombre de servicio, no localhost
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+      - PORT=3001
+    depends_on:
+      neo4j:
+        condition: service_healthy   # No arranca hasta que Neo4j responde al healthcheck
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ── Frontend React/Vite ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+    container_name: dj-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # Vite usa esta variable para el proxy /api → backend
+      - API_TARGET=http://backend:3001
+    depends_on:
+      backend:
+        condition: service_healthy   # No arranca hasta que el backend está listo
+    restart: on-failure
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
