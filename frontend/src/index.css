@@ -2,8 +2,171 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Scrollbar oscuro para el tema DJ */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0f172a; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg-deep:    #f0f2f5;
+  --bg-panel:   #ffffff;
+  --bg-surface: #f5f7fa;
+  --bg-raised:  #e8ecf2;
+  --accent-a:   #5b3fd4;
+  --accent-b:   #009e7f;
+  --accent-warn:#d4820a;
+  --accent-red: #d4294a;
+  --text-bright:#1a1a2e;
+  --text-mid:   #4a4a7a;
+  --text-dim:   #8888aa;
+  --border:     #d0d4e0;
+  --border-glow:#b0b8d0;
+  --led-green:  #00aa55;
+  --led-amber:  #cc8800;
+  --led-red:    #cc2244;
+  --vu-low:     #00aa44;
+  --vu-mid:     #ccaa00;
+  --vu-high:    #cc3333;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg-deep);
+  color: var(--text-bright);
+  font-family: 'Chakra Petch', sans-serif;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-a); }
+
+#root { position: relative; z-index: 1; }
+
+/* Knob animation */
+@keyframes led-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes vu-dance {
+  0%   { height: 20%; }
+  25%  { height: 70%; }
+  50%  { height: 45%; }
+  75%  { height: 85%; }
+  100% { height: 30%; }
+}
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 0.15; }
+  90%  { opacity: 0.15; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+@keyframes slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px var(--accent-a); }
+  50%       { box-shadow: 0 0 12px var(--accent-a), 0 0 24px var(--accent-a)40; }
+}
+
+.animate-slide-up { animation: slide-up 0.35s ease both; }
+.animate-fade-in  { animation: fade-in 0.4s ease both; }
+
+/* Panel screws */
+.panel-screw {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #c8ccd8, #a0a8bc);
+  border: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+}
+.panel-screw::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, transparent 40%, #ffffff60 41%);
+}
+
+/* LED dot */
+.led {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.led-green { background: var(--led-green); box-shadow: 0 0 6px var(--led-green); }
+.led-amber { background: var(--led-amber); box-shadow: 0 0 6px var(--led-amber); animation: led-blink 1.2s ease-in-out infinite; }
+.led-red   { background: var(--led-red);   box-shadow: 0 0 6px var(--led-red);   animation: led-blink 0.6s ease-in-out infinite; }
+.led-off   { background: #c8ccd8; box-shadow: none; }
+
+/* Slider/fader track */
+.fader-track {
+  position: relative;
+  background: #e0e4ee;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.fader-thumb {
+  background: linear-gradient(180deg, #ffffff 0%, #e8ecf4 50%, #d0d6e8 100%);
+  border: 1px solid var(--border-glow);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  box-shadow: 0 1px 3px #00000020;
+}
+.fader-thumb:hover { border-color: var(--accent-a); }
+
+/* Section label */
+.section-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* Metric chip */
+.metric-chip {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+
+/* Waveform bar */
+.wave-bar { border-radius: 1px; transition: height 0.3s ease; }
+
+/* Compat badge */
+.compat-perfect  { color: var(--led-green);  border-color: #00aa5544; background: #00aa5510; }
+.compat-harmonic { color: var(--led-amber);  border-color: #cc880044; background: #cc880010; }
+.compat-creative { color: var(--led-red);    border-color: #cc224444; background: #cc224410; }
+
+/* Input overrides */
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  background: var(--bg-panel) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-bright) !important;
+  font-family: 'Share Tech Mono', monospace !important;
+  font-size: 12px !important;
+  border-radius: 4px;
+  padding: 6px 10px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+input:focus {
+  border-color: var(--accent-a) !important;
+  box-shadow: 0 0 0 2px #5b3fd422;
+}
+input::placeholder { color: var(--text-dim) !important; }
+input:disabled { opacity: 0.35; cursor: not-allowed; }

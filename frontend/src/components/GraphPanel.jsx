@@ -1,89 +1,122 @@
 import React from 'react';
 
-const STEP_COLORS = {
-  idle:    'text-slate-400',
-  running: 'text-yellow-400',
-  done:    'text-emerald-400',
-  error:   'text-red-400',
-};
-
 const STATUS_LABELS = {
   idle:    'Sin inicializar',
-  running: 'Inicializando...',
-  done:    'Listo',
+  running: 'Cargando dataset...',
+  done:    'Online',
   error:   'Error',
 };
 
-export default function GraphPanel({ job, onInit, disabled }) {
+export default function GraphPanel({ job, onInit }) {
   const { status, step, progress, stats, error } = job;
   const isRunning = status === 'running';
   const isDone    = status === 'done';
 
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-      {/* Cabecera */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-2.5 h-2.5 rounded-full ${
-            isRunning ? 'bg-yellow-400 animate-pulse' :
-            isDone    ? 'bg-emerald-400' :
-            status === 'error' ? 'bg-red-500' : 'bg-slate-600'
-          }`} />
-          <span className="text-sm font-mono text-slate-300">
-            Estado del grafo Neo4j GDS:{' '}
-            <span className={`font-bold ${STEP_COLORS[status] ?? 'text-slate-400'}`}>
-              {STATUS_LABELS[status]}
-            </span>
-          </span>
-          {isDone && stats && (
-            <span className="text-xs text-slate-500 font-mono">
-              — {stats.nodes.toLocaleString()} canciones · {stats.relationships.toLocaleString()} relaciones
-            </span>
-          )}
-        </div>
+  const ledClass = isRunning ? 'led led-amber'
+                 : isDone    ? 'led led-green'
+                 : status === 'error' ? 'led led-red'
+                 : 'led led-off';
 
-        <button
-          onClick={onInit}
-          disabled={disabled || isRunning}
-          className={`px-4 py-2 rounded-lg text-sm font-bold font-mono transition-all ${
-            isRunning
-              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-              : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/40 active:scale-95'
-          }`}
-        >
-          {isRunning ? '⏳ Procesando...' : isDone ? '↺ Re-inicializar' : '⚡ Inicializar Grafo'}
-        </button>
+  return (
+    <div style={{
+      background: 'var(--bg-panel)',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      padding: '14px 18px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px',
+      flexWrap: 'wrap',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* scan line when running */}
+      {isRunning && (
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(180deg, transparent 0%, var(--accent-a) 50%, transparent 100%)',
+          height: '40px', width: '100%',
+          animation: 'scan-line 2.5s linear infinite',
+        }} />
+      )}
+
+      {/* Screws */}
+      <div className="panel-screw" />
+
+      {/* Status cluster */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+        <div className={ledClass} />
+        <div>
+          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Neo4j GDS
+          </div>
+          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '13px', color: isDone ? 'var(--led-green)' : isRunning ? 'var(--led-amber)' : 'var(--text-mid)' }}>
+            {STATUS_LABELS[status]}
+            {isDone && stats && (
+              <span style={{ color: 'var(--text-dim)', marginLeft: '8px' }}>
+                · {stats.nodes?.toLocaleString()} tracks · {stats.relationships?.toLocaleString()} edges
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Barra de progreso + mensaje de paso */}
-      {(isRunning || status === 'error') && (
-        <div className="space-y-2">
-          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className={`text-xs font-mono ${STEP_COLORS[status]}`}>
+      {/* Progress bar */}
+      {isRunning && (
+        <div style={{ flex: 2, minWidth: '160px' }}>
+          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '10px', color: 'var(--text-dim)', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {step}
-          </p>
+          </div>
+          <div style={{ height: '4px', background: 'var(--bg-deep)', borderRadius: '2px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+            <div style={{
+              height: '100%',
+              width: `${progress}%`,
+              background: 'var(--accent-a)',
+              borderRadius: '2px',
+              transition: 'width 0.5s ease',
+              boxShadow: '0 0 8px var(--accent-a)',
+            }} />
+          </div>
         </div>
       )}
 
-      {/* Error */}
-      {status === 'error' && error && (
-        <div className="bg-red-950/40 border border-red-800 rounded-lg p-3">
-          <p className="text-xs text-red-400 font-mono">{error}</p>
-        </div>
-      )}
-
-      {/* Info disclaimer para el usuario */}
       {status === 'idle' && (
-        <p className="text-xs text-slate-600 font-mono">
-          La inicialización importa el dataset completo (~113k canciones), calcula similitudes coseno
-          con GDS kNN y proyecta el grafo de rutas A*. Puede tardar <strong className="text-slate-400">5–15 minutos</strong> según el hardware.
+        <p style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '10px', color: 'var(--text-dim)', flex: 2 }}>
+          Importa 113k canciones · kNN coseno GDS · grafo A* · 5–15 min primera vez
         </p>
       )}
+
+      {status === 'error' && error && (
+        <p style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '10px', color: 'var(--led-red)', flex: 2 }}>
+          ⚠ {error}
+        </p>
+      )}
+
+      {/* Button */}
+      <button
+        onClick={onInit}
+        disabled={isRunning}
+        style={{
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: '11px',
+          letterSpacing: '0.1em',
+          padding: '7px 16px',
+          borderRadius: '4px',
+          border: `1px solid ${isRunning ? 'var(--border)' : 'var(--accent-a)'}`,
+          background: isRunning ? 'var(--bg-surface)' : '#5b3fd418',
+          color: isRunning ? 'var(--text-dim)' : 'var(--accent-a)',
+          cursor: isRunning ? 'not-allowed' : 'pointer',
+          textTransform: 'uppercase',
+          transition: 'all 0.15s',
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={e => { if (!isRunning) e.target.style.background = '#5b3fd430'; }}
+        onMouseLeave={e => { if (!isRunning) e.target.style.background = '#5b3fd418'; }}
+      >
+        {isRunning ? '⏳ Procesando...' : isDone ? '↺ Re-init' : '⚡ Init Graph'}
+      </button>
+
+      <div className="panel-screw" />
     </div>
   );
 }

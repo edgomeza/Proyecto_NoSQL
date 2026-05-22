@@ -1,8 +1,6 @@
 import React from 'react';
 import TrackCard, { TransitionConnector } from './TrackCard';
 
-// Distancia coseno entre features acústicas de dos canciones.
-// Necesaria para recalcular step_cost en vivo tras eliminar intermedias.
 const FEAT = ['energy', 'danceability', 'valence', 'acousticness'];
 function cosineDist(a, b) {
   let dot = 0, mA = 0, mB = 0;
@@ -17,91 +15,84 @@ function cosineDist(a, b) {
 export default function TrackTimeline({ playlist, onRemove, pathType }) {
   if (!playlist?.length) return null;
 
-  // Recalcula step_cost y step en tiempo real (cambia al eliminar intermedias)
   const live = playlist.map((track, i) => ({
-    ...track,
-    step:      i + 1,
-    is_start:  i === 0,
-    is_end:    i === playlist.length - 1,
+    ...track, step: i + 1,
+    is_start: i === 0, is_end: i === playlist.length - 1,
     step_cost: i === 0 ? 0 : cosineDist(playlist[i - 1], track),
   }));
 
-  const totalCost = live.reduce((s, t) => s + t.step_cost, 0);
-  const totalHops = live.length;
+  const totalCost   = live.reduce((s, t) => s + t.step_cost, 0);
+  const totalHops   = live.length;
   const intermediates = totalHops - 2;
 
   return (
-    <section className="space-y-1 mt-8">
-      {/* Cabecera de resultados */}
-      <div className="flex items-center justify-between mb-4">
+    <section style={{ animation: 'fade-in 0.4s ease' }}>
+      {/* Results header */}
+      <div style={{
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        padding: '14px 18px',
+        marginBottom: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px',
+      }}>
         <div>
-          <h2 className="text-lg font-bold text-white font-mono">
-            Ruta encontrada
-          </h2>
-          <p className="text-xs text-slate-500 font-mono mt-0.5">
-            Algoritmo A* · grafo GDS · similitud coseno
-            {pathType === 'bridge' && (
-              <span className="ml-2 text-yellow-600">· puente acústico</span>
-            )}
-          </p>
+          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '3px' }}>
+            A* Route Found{pathType === 'bridge' ? ' · acoustic bridge' : ''}
+          </div>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-bright)' }}>
+            Ruta óptima calculada
+          </div>
         </div>
-        <div className="flex gap-4 text-right">
-          <div>
-            <p className="text-2xl font-black text-violet-400 font-mono">{totalHops}</p>
-            <p className="text-xs text-slate-500 font-mono">canciones</p>
-          </div>
-          <div>
-            <p className="text-2xl font-black text-slate-500 font-mono">{intermediates}</p>
-            <p className="text-xs text-slate-500 font-mono">intermedias</p>
-          </div>
-          <div>
-            <p className="text-2xl font-black text-cyan-400 font-mono">
-              {totalCost.toFixed(3)}
-            </p>
-            <p className="text-xs text-slate-500 font-mono">coste total</p>
-          </div>
+        <div style={{ display: 'flex', gap: '20px' }}>
+          {[
+            { val: totalHops,   label: 'canciones',  color: 'var(--accent-a)' },
+            { val: intermediates, label: 'bridges', color: 'var(--text-mid)' },
+            { val: totalCost.toFixed(3), label: 'coste total', color: 'var(--accent-b)' },
+          ].map(({ val, label, color }) => (
+            <div key={label} style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '22px', fontWeight: 700, color, lineHeight: 1 }}>{val}</div>
+              <div className="section-label" style={{ marginTop: '3px' }}>{label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Instrucción de edición */}
-      {intermediates > 0 && (
-        <div className="flex items-center gap-2 mb-4 px-1">
-          <svg className="w-3.5 h-3.5 text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-xs text-slate-600 font-mono">
-            Pulsa <span className="text-slate-500">✕</span> en cualquier canción intermedia para eliminarla de la ruta
-          </p>
-        </div>
-      )}
-
-      {/* Leyenda de compatibilidad armónica */}
-      <div className="flex flex-wrap gap-3 mb-4 pb-4 border-b border-slate-800">
+      {/* Leyenda */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '10px',
+        padding: '8px 12px',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '6px',
+        marginBottom: '10px',
+      }}>
         {[
-          { color: 'bg-emerald-400', label: 'Perfecta / Relativa' },
-          { color: 'bg-yellow-400',  label: 'Armónica / Compatible' },
-          { color: 'bg-red-400',     label: 'Creativa' },
-        ].map(({ color, label }) => (
-          <div key={label} className="flex items-center gap-1.5 text-xs font-mono text-slate-400">
-            <span className={`w-2 h-2 rounded-full ${color}`} />
-            {label}
+          { cls: 'compat-perfect',  label: 'Perfecta / Relativa' },
+          { cls: 'compat-harmonic', label: 'Armónica / Compatible' },
+          { cls: 'compat-creative', label: 'Creativa' },
+        ].map(({ cls, label }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div className={`metric-chip ${cls}`} style={{ padding: '1px 6px', fontSize: '8px' }}>●</div>
+            <span className="section-label">{label}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />BPM ≤3 suave
-          <span className="w-2 h-2 rounded-full bg-yellow-400 ml-2" />3–8 moderado
-          <span className="w-2 h-2 rounded-full bg-red-400 ml-2" />&gt;8 brusco
-        </div>
+        {intermediates > 0 && (
+          <div style={{ marginLeft: 'auto', fontFamily: "'Share Tech Mono', monospace", fontSize: '9px', color: 'var(--text-dim)' }}>
+            ✕ para eliminar intermedias
+          </div>
+        )}
       </div>
 
-      {/* Timeline de canciones */}
-      <div>
+      {/* Cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {live.map((track, i) => (
           <React.Fragment key={track.track_id + '_' + i}>
-            {i > 0 && (
-              <TransitionConnector prev={live[i - 1]} curr={track} />
-            )}
+            {i > 0 && <TransitionConnector prev={live[i - 1]} curr={track} />}
             <TrackCard
               track={track}
               isStart={track.is_start}
@@ -112,10 +103,9 @@ export default function TrackTimeline({ playlist, onRemove, pathType }) {
         ))}
       </div>
 
-      {/* Nota final */}
-      <p className="text-xs text-slate-600 font-mono pt-4 border-t border-slate-800">
-        Coste = distancia acústica acumulada · weight = 1 − similitud_coseno(energy, danceability, valence, bpm, key_cos, key_sin)
-      </p>
+      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '9px', color: 'var(--text-dim)', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+        weight = 1 − cosine_similarity(energy, danceability, valence, bpm_norm, key_cos, key_sin)
+      </div>
     </section>
   );
 }
