@@ -3,9 +3,8 @@ const { driver } = require('../config/neo4j');
 const GRAPH_SIM   = 'dj-similarity';
 const GRAPH_ROUTE = 'dj-routing';
 
-// ── Estado compartido del job de inicialización ───────────────────────────────
 const jobState = {
-  status: 'idle',   // idle | running | done | error
+  status: 'idle',
   step: '',
   progress: 0,
   stats: null,
@@ -18,8 +17,6 @@ function updateJob(fields) {
   Object.assign(jobState, fields);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 async function dropGraphIfExists(session, name) {
   const { records } = await session.run(
     'CALL gds.graph.exists($name) YIELD exists RETURN exists',
@@ -31,14 +28,11 @@ async function dropGraphIfExists(session, name) {
   }
 }
 
-// ── Inicialización completa (LOAD CSV + kNN + Dijkstra projection) ────────────
-
 async function runInit() {
   const session = driver.session();
   try {
     updateJob({ status: 'running', startedAt: new Date(), finishedAt: null, error: null, stats: null });
 
-    // Paso 1: Índices ────────────────────────────────────────────────────────
     updateJob({ step: 'Creando índices de base de datos...', progress: 5 });
     console.log('[Init] 1/6 Creando índices');
     await session.run('CREATE INDEX song_track_id IF NOT EXISTS FOR (s:Song) ON (s.track_id)');
@@ -48,57 +42,19 @@ async function runInit() {
       FOR (s:Song) ON EACH [s.track_name, s.artists]
     `);
 
-    // Paso 2: Limpiar datos previos ──────────────────────────────────────────
     updateJob({ step: 'Limpiando datos anteriores...', progress: 10 });
     console.log('[Init] 2/6 Limpiando datos anteriores');
     await dropGraphIfExists(session, GRAPH_SIM);
     await dropGraphIfExists(session, GRAPH_ROUTE);
-    // Borrar nodos en lotes para evitar picos de memoria
     let deleted = 1;
     while (deleted > 0) {
       const r = await session.run('MATCH (s:Song) WITH s LIMIT 10000 DETACH DELETE s RETURN count(s) AS n');
       deleted = r.records[0]?.get('n')?.toNumber() ?? 0;
     }
 
-    // Paso 3: LOAD CSV ───────────────────────────────────────────────────────
     updateJob({ step: 'Importando 113k canciones desde dataset.csv...', progress: 20 });
     console.log('[Init] 3/6 LOAD CSV dataset completo');
 
-    /*
-     * CALL { } IN TRANSACTIONS es la forma recomendada en Neo4j 5.x para
-     * importar grandes volúmenes sin agotar la memoria de transacción.
-     * MERGE evita duplicados cuando la misma track_id aparece en varios géneros.
-     * bpm_normalized mapea [60–200 BPM] a [0.0–1.0] para igualar la escala
-     * con energy, danceability y valence antes de aplicar similitud coseno.
-     */
-    /*
-     * Codificación armónica circular (Rueda de Camelot / Círculo de Quintas):
-     *
-     * Spotify devuelve key (0-11, cromatico) y mode (0=menor, 1=mayor).
-     * No se puede usar key directamente en cosine similarity porque es circular
-     * (Do=0 y Si=11 son adyacentes, no distantes). La solución:
-     *
-     *   1. Convertir de cromático a posición en el círculo de quintas:
-     *        fifthPos = (key × 7) mod 12
-     *        (×7 porque una quinta perfecta = 7 semitonos)
-     *
-     *   2. Obtener índice Camelot 0-11 (número - 1):
-     *        mayor: ci = ((fifthPos + 5) mod 12 + 11) mod 12
-     *        menor: ci = ((fifthPos + 2) mod 12 + 11) mod 12
-     *
-     *   3. Mapear a 24 posiciones intercalando mayor/menor:
-     *        wheelPos = ci×2          para mayor (B en Camelot)
-     *        wheelPos = ci×2 + 1      para menor (A en Camelot)
-     *        → posiciones adyacentes = tónica relativa (máx. compatibilidad)
-     *
-     *   4. Coordenadas trigonométricas normalizadas a [0,1]:
-     *        angle   = 2π × wheelPos / 24
-     *        key_cos = (cos(angle) + 1) / 2
-     *        key_sin = (sin(angle) + 1) / 2
-     *
-     * Verificación: Do mayor (8B) ↔ La menor (8A) = posiciones 8 y 9 → distancia 1 ✓
-     *              Do mayor (8B) ↔ Sol mayor (6B) = posiciones 8 y 10 → distancia 2 ✓
-     */
     await session.run(`
       LOAD CSV WITH HEADERS FROM 'file:///dataset.csv' AS row
       CALL {
@@ -145,16 +101,9 @@ async function runInit() {
     console.log(`  Nodos importados: ${nodeCount.toLocaleString()}`);
     updateJob({ progress: 40 });
 
-    // Paso 4: Proyectar grafo de características en memoria ──────────────────
     updateJob({ step: 'Proyectando grafo de características en GDS...', progress: 45 });
     console.log('[Init] 4/6 Proyectar grafo para kNN');
 
-    /*
-     * Proyectamos solo los nodos Song con sus propiedades numéricas.
-     * kNN trabaja exclusivamente con vectores de nodos; no necesita relaciones.
-     */
-    // key_cos y key_sin codifican la posición en la rueda de Camelot como
-    // coordenadas trigonométricas, preservando la circularidad del círculo de quintas.
     await session.run(`
       CALL gds.graph.project(
         $name,
@@ -174,20 +123,9 @@ async function runInit() {
       ) YIELD graphName, nodeCount
     `, { name: GRAPH_SIM });
 
-    // Paso 5: kNN cosine similarity → relaciones TRANSITIONS_TO ─────────────
     updateJob({ step: 'Calculando similitud coseno GDS kNN — puede tardar varios minutos...', progress: 50 });
     console.log('[Init] 5/6 gds.knn.write (topK=8, cosine) — proceso largo...');
 
-    /*
-     * gds.knn.write calcula los 8 vecinos más similares por similitud coseno
-     * sobre el vector [energy, danceability, valence, bpm_normalized] y escribe
-     * relaciones :TRANSITIONS_TO con la propiedad `score` (0=idéntico, 1=opuesto).
-     * Después invertimos: weight = 1 − score, de modo que Dijkstra minimice el
-     * "coste de transición" (peso bajo = canciones acústicamente compatibles).
-     */
-    // Vector de 6 dimensiones: 4 acústicas + 2 armónicas (círculo de quintas)
-    // Las coordenadas key_cos/key_sin aportan ~33% del peso total en cosine similarity,
-    // priorizando compatibilidad armónica sin sacrificar la cohesión acústica.
     await session.run(`
       CALL gds.knn.write($name, {
         topK: 8,
@@ -201,7 +139,6 @@ async function runInit() {
       YIELD nodesCompared, relationshipsWritten
     `, { name: GRAPH_SIM });
 
-    // Invertir score → weight en lotes (puede ser >800k relaciones)
     await session.run(`
       MATCH ()-[r:TRANSITIONS_TO]->()
       CALL {
@@ -217,7 +154,6 @@ async function runInit() {
     await dropGraphIfExists(session, GRAPH_SIM);
     updateJob({ progress: 85 });
 
-    // Paso 6: Proyectar grafo de routing para Dijkstra ───────────────────────
     updateJob({ step: 'Proyectando grafo de ruta Dijkstra en GDS...', progress: 90 });
     console.log('[Init] 6/6 Proyectar grafo dj-routing');
     await _projectRoutingGraph(session);
@@ -240,15 +176,12 @@ async function runInit() {
   }
 }
 
-// ── Re-proyección rápida (usada en reinicios cuando los datos ya existen) ─────
-
 async function reprojectRoutingGraph() {
   const session = driver.session();
   try {
     updateJob({ status: 'running', step: 'Re-proyectando grafo GDS tras reinicio...', progress: 90, startedAt: new Date() });
     await _projectRoutingGraph(session);
 
-    // Leer estadísticas actuales para el status del frontend
     const { records } = await session.run(`
       MATCH (s:Song) WITH count(s) AS nodes
       OPTIONAL MATCH ()-[r:TRANSITIONS_TO]->()
@@ -275,7 +208,6 @@ async function reprojectRoutingGraph() {
   }
 }
 
-// Función interna compartida para proyectar el grafo de routing
 async function _projectRoutingGraph(session) {
   await dropGraphIfExists(session, GRAPH_ROUTE);
   await session.run(`
@@ -292,13 +224,11 @@ async function _projectRoutingGraph(session) {
   `, { name: GRAPH_ROUTE });
 }
 
-// ── Controladores de ruta HTTP ────────────────────────────────────────────────
-
 async function startInit(req, res) {
   if (jobState.status === 'running') {
     return res.status(409).json({ success: false, message: 'La inicialización ya está en progreso', job: jobState });
   }
-  runInit(); // fire-and-forget
+  runInit();
   res.json({ success: true, message: 'Inicialización iniciada', job: jobState });
 }
 

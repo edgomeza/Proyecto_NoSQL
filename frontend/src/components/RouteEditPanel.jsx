@@ -81,7 +81,6 @@ export default function RouteEditPanel({ originalPlaylist, onFilter }) {
 
       {open && (
         <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* BPM */}
           <div>
             <div className="section-label" style={{ marginBottom: '7px' }}>Rango BPM · {bpmBounds.min}–{bpmBounds.max}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -92,7 +91,6 @@ export default function RouteEditPanel({ originalPlaylist, onFilter }) {
             </div>
           </div>
 
-          {/* Camelot */}
           {allCamelots.length > 0 && (
             <div>
               <div className="section-label" style={{ marginBottom: '7px' }}>Tonalidad (Camelot)</div>
@@ -109,7 +107,6 @@ export default function RouteEditPanel({ originalPlaylist, onFilter }) {
             </div>
           )}
 
-          {/* Genres */}
           {allGenres.length > 0 && (
             <div>
               <div className="section-label" style={{ marginBottom: '7px' }}>Género</div>

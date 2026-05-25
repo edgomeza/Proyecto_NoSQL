@@ -58,7 +58,6 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-deep)' }}>
 
-      {/* Header */}
       <header style={{
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-panel)',
@@ -85,7 +84,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main */}
       <main style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
         <GraphPanel job={job} onInit={handleInit} />
@@ -119,7 +117,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer */}
       <footer style={{ borderTop: '1px solid var(--border)', marginTop: '40px', padding: '16px 20px', textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
           <div className="panel-screw" />

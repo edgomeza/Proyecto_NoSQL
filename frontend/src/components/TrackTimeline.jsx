@@ -27,7 +27,6 @@ export default function TrackTimeline({ playlist, onRemove, pathType }) {
 
   return (
     <section style={{ animation: 'fade-in 0.4s ease' }}>
-      {/* Results header */}
       <div style={{
         background: 'var(--bg-panel)',
         border: '1px solid var(--border)',
@@ -62,7 +61,6 @@ export default function TrackTimeline({ playlist, onRemove, pathType }) {
         </div>
       </div>
 
-      {/* Leyenda */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: '10px',
         padding: '8px 12px',
@@ -88,7 +86,6 @@ export default function TrackTimeline({ playlist, onRemove, pathType }) {
         )}
       </div>
 
-      {/* Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {live.map((track, i) => (
           <React.Fragment key={track.track_id + '_' + i}>

@@ -86,7 +86,6 @@ export default function TrackCard({ track, isStart, isEnd, onRemove }) {
     }}
       className="animate-slide-up"
     >
-      {/* Left accent bar */}
       <div style={{
         position: 'absolute', left: 0, top: '8px', bottom: '8px',
         width: '2px', borderRadius: '0 1px 1px 0',

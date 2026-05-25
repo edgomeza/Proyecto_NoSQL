@@ -9,8 +9,6 @@ const ENRICHMENT_THRESHOLD     = 0.08;  // parar de enriquecer cuando todas las 
 
 const toNum = (v) => (v != null && typeof v.toNumber === 'function' ? v.toNumber() : Number(v));
 
-// ── Min-heap para A* (ordenado por f = g + h) ────────────────────────────────
-
 class MinHeap {
   constructor() { this._h = []; }
 
@@ -47,10 +45,6 @@ class MinHeap {
   get size() { return this._h.length; }
 }
 
-// ── Heurística A*: distancia coseno entre vectores acústicos ──────────────────
-// Admisible: peso de cualquier arista directa n→dest = cosineDist(n, dest)
-// → coste mínimo restante ≥ cosineDist(n, dest) = h(n)
-
 const FEAT_KEYS = ['energy', 'danceability', 'valence', 'acousticness'];
 
 function cosineDist(a, b) {
@@ -63,9 +57,6 @@ function cosineDist(a, b) {
   return (mA && mB) ? 1 - dot / (Math.sqrt(mA) * Math.sqrt(mB)) : 1;
 }
 
-// ── Consultas Cypher ─────────────────────────────────────────────────────────
-
-// Carga los dos nodos extremos en una sola query (evita dos runs concurrentes en la misma sesión)
 const ENDPOINTS_QUERY = `
   MATCH (s:Song) WHERE s.track_id IN [$startId, $endId]
   RETURN s.track_id     AS track_id,
@@ -83,8 +74,6 @@ const ENDPOINTS_QUERY = `
          s.popularity   AS popularity
 `;
 
-// El destino siempre se incluye para garantizar que A* puede cerrar el camino.
-// $noFilter=true cuando no hay restricción de género.
 const NEIGHBOR_QUERY = `
   MATCH (n:Song {track_id: $id})-[r:TRANSITIONS_TO]->(nb:Song)
   WHERE $noFilter OR nb.track_id = $endId OR nb.genre IN $genres
@@ -122,17 +111,12 @@ function recToNode(rec) {
   };
 }
 
-// ── Path thinning ────────────────────────────────────────────────────────────
-// Si A* devuelve un camino más largo que maxIntermediates, selecciona nodos
-// equidistantes del camino original y recalcula pesos como distancia acústica.
-// Así siempre se respeta el límite de pasos sin romper la suavidad acústica.
-
 function thinPath(nodes, originalWeights, maxIntermediates) {
   if (nodes.length - 2 <= maxIntermediates) {
     return { nodes, weights: originalWeights };
   }
 
-  const inner = nodes.slice(1, -1); // nodos intermedios del camino original
+  const inner = nodes.slice(1, -1);
   const kept  = [nodes[0]];
 
   for (let i = 0; i < maxIntermediates; i++) {
@@ -146,11 +130,6 @@ function thinPath(nodes, originalWeights, maxIntermediates) {
   );
   return { nodes: kept, weights };
 }
-
-// ── Acoustic bridge fallback ─────────────────────────────────────────────────
-// Cuando A* no encuentra ruta en el grafo, construye un camino sintético buscando
-// canciones acústicamente cercanas al punto medio entre inicio y destino.
-// Garantiza que siempre se devuelve algún resultado.
 
 async function acousticBridge(session, startNode, endNode, bridgeCount) {
   const mid = (k) => ((parseFloat(startNode[k]) || 0) + (parseFloat(endNode[k]) || 0)) / 2;
@@ -183,7 +162,6 @@ async function acousticBridge(session, startNode, endNode, bridgeCount) {
 
   if (!records.length) return null;
 
-  // Ordenar puentes por progreso hacia el destino (más lejanos al destino van primero)
   const bridges = records.map(recToNode)
     .sort((a, b) => cosineDist(b, endNode) - cosineDist(a, endNode));
 
@@ -194,17 +172,13 @@ async function acousticBridge(session, startNode, endNode, bridgeCount) {
   return { nodes: allNodes, weights };
 }
 
-// ── Algoritmo A* ─────────────────────────────────────────────────────────────
-// Sin penalización de salto: busca el camino de mínimo coste acústico real.
-// Caché de vecinos: evita re-consultar el mismo nodo en expansiones distintas.
-
 async function astarSearch({ session, startNode, endNode, maxDepth, genres, maxExpansions }) {
   const noFilter      = !genres || genres.length === 0;
   const endId         = endNode.track_id;
   const h             = (node) => cosineDist(node, endNode);
   const openSet       = new MinHeap();
   const bestG         = new Map();
-  const neighborCache = new Map(); // track_id → [{node, edgeW}]
+  const neighborCache = new Map();
 
   bestG.set(startNode.track_id, 0);
   openSet.push({ f: h(startNode), g: 0, depth: 0, node: startNode, path: [startNode], weights: [] });
@@ -232,7 +206,7 @@ async function astarSearch({ session, startNode, endNode, maxDepth, genres, maxE
     }
 
     for (const { node: nb, edgeW } of neighbors) {
-      const g = curr.g + edgeW; // sin penalización de salto
+      const g = curr.g + edgeW;
 
       if (g < (bestG.get(nb.track_id) ?? Infinity)) {
         bestG.set(nb.track_id, g);
@@ -251,23 +225,11 @@ async function astarSearch({ session, startNode, endNode, maxDepth, genres, maxE
   return null;
 }
 
-// ── Enriquecimiento de ruta ───────────────────────────────────────────────────
-// Después de que A* encuentra el camino óptimo (posiblemente corto), inserta
-// nodos intermedios en la transición más brusca hasta tener suficientes saltos
-// o hasta que no se pueda mejorar más la peor transición.
-//
-// En cada iteración:
-//   1. Identifica el par (a → b) con mayor distancia acústica.
-//   2. Busca entre los vecinos de `a` y los vecinos de `b` el nodo Z que
-//      minimiza max(dist(a,Z), dist(Z,b)) — el mejor "puente" entre ambos.
-//   3. Si Z mejora la peor transición, lo inserta; si no, termina.
-
 async function enrichPath(session, initialNodes, targetIntermediates) {
   const inPath = new Set(initialNodes.map(n => n.track_id));
   let nodes    = [...initialNodes];
 
   while (nodes.length - 2 < targetIntermediates) {
-    // Encuentra la transición más brusca (mayor distancia coseno)
     let worstIdx = 0, worstCost = -1;
     for (let i = 0; i < nodes.length - 1; i++) {
       const c = cosineDist(nodes[i], nodes[i + 1]);
@@ -279,9 +241,6 @@ async function enrichPath(session, initialNodes, targetIntermediates) {
     const a = nodes[worstIdx];
     const b = nodes[worstIdx + 1];
 
-    // Búsqueda amplia: 25 canciones más próximas al punto medio acústico de (a, b).
-    // Usar el punto medio garantiza candidatos que suavizan la transición sin importar
-    // qué vecinos kNN tiene cada extremo — evita el límite de topK=8.
     const { records } = await session.run(`
       MATCH (s:Song)
       WHERE NOT s.track_id IN $excluded
@@ -321,8 +280,6 @@ async function enrichPath(session, initialNodes, targetIntermediates) {
 
   return nodes;
 }
-
-// ── Búsqueda de canciones ────────────────────────────────────────────────────
 
 async function searchTracks(req, res) {
   const query = (req.query.q || '').trim();
@@ -384,8 +341,6 @@ async function searchTracks(req, res) {
   }
 }
 
-// ── Géneros disponibles ──────────────────────────────────────────────────────
-
 async function getGenres(req, res) {
   const session = driver.session();
   try {
@@ -399,13 +354,6 @@ async function getGenres(req, res) {
     await session.close();
   }
 }
-
-// ── Recomendación: A* + enriquecimiento de ruta ──────────────────────────────
-// Estrategia:
-//   1. A* sin penalización → camino de mínimo coste acústico real
-//   2. enrichPath → inserta nodos en transiciones bruscas hasta llegar a
-//      TARGET_MIN_INTERMEDIATES o hasta que no queden mejoras disponibles
-//   3. Fallback: puente acústico si el grafo está desconectado
 
 async function recommend(req, res) {
   const { start_track_id, end_track_id } = req.body;
@@ -430,7 +378,6 @@ async function recommend(req, res) {
       });
     }
 
-    // Carga ambos nodos en una sola query
     const { records: epRecs } = await session.run(ENDPOINTS_QUERY, {
       startId: start_track_id,
       endId:   end_track_id,
@@ -443,7 +390,6 @@ async function recommend(req, res) {
       return res.status(404).json({ success: false, error: 'Una o ambas canciones no existen en el grafo.' });
     }
 
-    // ── Intento 1: A* estándar (sin penalización, profundidad hasta 20) ────
     let astarResult = await astarSearch({
       session, startNode, endNode,
       maxDepth:      20,
@@ -451,7 +397,6 @@ async function recommend(req, res) {
       maxExpansions: MAX_EXPANSIONS_A,
     });
 
-    // ── Intento 2: búsqueda más exhaustiva si el primero agotó expansiones ─
     if (!astarResult) {
       astarResult = await astarSearch({
         session, startNode, endNode,
@@ -464,7 +409,6 @@ async function recommend(req, res) {
     let finalNodes, finalWeights, pathType;
 
     if (astarResult) {
-      // Enriquecer el camino insertando nodos en las transiciones más bruscas
       const enriched = await enrichPath(session, astarResult.path, TARGET_MIN_INTERMEDIATES);
       finalNodes   = enriched;
       finalWeights = enriched.slice(1).map((n, i) =>
@@ -472,7 +416,6 @@ async function recommend(req, res) {
       );
       pathType = 'optimal';
     } else {
-      // ── Intento 3: puente acústico (grafo desconectado) ─────────────────
       const bridge = await acousticBridge(session, startNode, endNode, 3);
       const bridgeNodes = bridge?.nodes ?? [startNode, endNode];
       const enriched    = await enrichPath(session, bridgeNodes, Math.min(TARGET_MIN_INTERMEDIATES, 4));

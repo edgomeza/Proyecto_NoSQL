@@ -25,11 +25,11 @@ services:
       # Solo el subdirectorio import se monta (evita que Neo4j cambie permisos del proyecto)
       - ./import:/var/lib/neo4j/import
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:7474"]
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
       interval: 20s
-      timeout: 10s
-      retries: 15
-      start_period: 90s   # El plugin GDS tarda en descargarse la primera vez
+      timeout: 15s
+      retries: 20
+      start_period: 120s  # El plugin GDS tarda en descargarse la primera vez
 
   # ── Backend Node.js ────────────────────────────────────────────────────────
   backend:

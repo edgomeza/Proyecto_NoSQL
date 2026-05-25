@@ -11,7 +11,6 @@ function Knob({ label, color = 'var(--accent-a)' }) {
         position: 'relative',
         boxShadow: 'inset 0 2px 4px #ffffff80, 0 2px 4px #00000018',
       }}>
-        {/* Center dot */}
         <div style={{
           position: 'absolute', top: '50%', left: '50%',
           width: '8px', height: '8px', borderRadius: '50%',
@@ -55,7 +54,6 @@ function Crossfader({ value = 0.5 }) {
   return (
     <div style={{ flex: 1 }}>
       <div className="section-label" style={{ marginBottom: '6px', textAlign: 'center' }}>Crossfader</div>
-      {/* Track exterior */}
       <div style={{
         position: 'relative',
         height: '12px',
@@ -65,14 +63,12 @@ function Crossfader({ value = 0.5 }) {
         margin: '0 8px',
         boxShadow: 'inset 0 1px 3px #00000015',
       }}>
-        {/* Fill izquierdo */}
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0,
           width: `${pct}%`,
           background: `linear-gradient(90deg, #5b3fd444, #009e7f44)`,
           borderRadius: '6px',
         }} />
-        {/* Thumb del fader — centrado verticalmente sobre el track */}
         <div style={{
           position: 'absolute',
           left: `${pct}%`,
@@ -86,7 +82,6 @@ function Crossfader({ value = 0.5 }) {
           cursor: 'pointer',
           zIndex: 2,
         }}>
-
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 8px 0', fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--text-dim)' }}>
@@ -112,7 +107,6 @@ export default function MixerSection({
       borderRadius: '10px',
       boxShadow: '0 2px 8px #00000010',
     }}>
-      {/* Top bar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 16px',
@@ -139,10 +133,8 @@ export default function MixerSection({
         <div className="panel-screw" />
       </div>
 
-      {/* Main mixer body */}
       <div style={{ padding: '16px', display: 'flex', gap: '12px', alignItems: 'stretch' }}>
 
-        {/* DECK A */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <TrackSearch
             label="Track de inicio"
@@ -161,7 +153,6 @@ export default function MixerSection({
           </div>
         </div>
 
-        {/* CENTER — Crossfader + Generate */}
         <div style={{
           width: '130px', flexShrink: 0,
           display: 'flex', flexDirection: 'column',
@@ -172,13 +163,11 @@ export default function MixerSection({
         }}>
           <Crossfader value={0.5} />
 
-          {/* CUE / MIX knobs */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <Knob label="CUE" value={0.6} color="var(--accent-warn)" />
             <Knob label="MIX" value={0.4} color="var(--accent-warn)" />
           </div>
 
-          {/* Generate button */}
           <button
             onClick={onRecommend}
             disabled={!canGenerate}
@@ -211,7 +200,6 @@ export default function MixerSection({
           )}
         </div>
 
-        {/* DECK B */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <TrackSearch
             label="Track de destino"

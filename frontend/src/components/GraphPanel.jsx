@@ -30,7 +30,6 @@ export default function GraphPanel({ job, onInit }) {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* scan line when running */}
       {isRunning && (
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -40,10 +39,8 @@ export default function GraphPanel({ job, onInit }) {
         }} />
       )}
 
-      {/* Screws */}
       <div className="panel-screw" />
 
-      {/* Status cluster */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
         <div className={ledClass} />
         <div>
@@ -61,7 +58,6 @@ export default function GraphPanel({ job, onInit }) {
         </div>
       </div>
 
-      {/* Progress bar */}
       {isRunning && (
         <div style={{ flex: 2, minWidth: '160px' }}>
           <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '10px', color: 'var(--text-dim)', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -92,7 +88,6 @@ export default function GraphPanel({ job, onInit }) {
         </p>
       )}
 
-      {/* Button */}
       <button
         onClick={onInit}
         disabled={isRunning}

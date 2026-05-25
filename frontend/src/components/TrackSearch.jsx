@@ -65,7 +65,6 @@ export default function TrackSearch({ label, deckId, accentColor, selected, onSe
 
   return (
     <div ref={containerRef} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-      {/* Deck panel */}
       <div style={{
         background: 'var(--bg-surface)',
         border: borderStyle,
@@ -73,7 +72,6 @@ export default function TrackSearch({ label, deckId, accentColor, selected, onSe
         transition: 'border-color 0.15s',
         boxShadow: open ? `0 0 12px ${accentColor}22` : 'none',
       }}>
-        {/* Deck header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 12px 6px',
@@ -96,7 +94,6 @@ export default function TrackSearch({ label, deckId, accentColor, selected, onSe
           </div>
         </div>
 
-        {/* Waveform display area */}
         <div style={{
           padding: '8px 12px 6px',
           background: 'var(--bg-deep)',
@@ -123,7 +120,6 @@ export default function TrackSearch({ label, deckId, accentColor, selected, onSe
           )}
         </div>
 
-        {/* Metrics row */}
         {selected && (
           <div style={{
             display: 'flex', gap: '6px', padding: '7px 12px',
@@ -147,7 +143,6 @@ export default function TrackSearch({ label, deckId, accentColor, selected, onSe
           </div>
         )}
 
-        {/* Search input */}
         <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {loading ? (
             <svg style={{ width: '12px', height: '12px', color: accentColor, flexShrink: 0, animation: 'spin 1s linear infinite' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -180,7 +175,6 @@ export default function TrackSearch({ label, deckId, accentColor, selected, onSe
         </div>
       </div>
 
-      {/* Dropdown */}
       {open && results.length > 0 && (
         <div style={{
           position: 'absolute', zIndex: 50, top: '100%', left: 0, right: 0,
